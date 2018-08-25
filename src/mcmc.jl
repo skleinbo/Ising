@@ -145,16 +145,14 @@ function _run_metropolis!(state::Matrix{Int8},beta,h;Tmax::Int=1,sample_interval
 
     k = 0 #counts the number of samples
 
-    # pick the middle lattice site for the spin correlation
-
-    t=0 #number of simulation steps
-    e=0.
-    mag=0.
+    t = 0 #simulation steps
+    e = 0.
+    mag = 0.
 
     @inbounds begin
         while(t<Tmax)
-            ## Do the defined no. of steps before
-            ## taking a measurement
+            ## Take the defined no. of steps before
+            ## recording a measurement
             sweep!(state,sample_interval,beta,h)
 
             ## Record observables
@@ -171,14 +169,14 @@ function _run_metropolis!(state::Matrix{Int8},beta,h;Tmax::Int=1,sample_interval
             t+=sample_interval
         end
     end
-    ## Return statistics about the observables
+    ## Return sample means
     return observables/k
 end
 
 """
     metropolis_timeseries(L, β, Tmax; sample_interval=L^2, sweep=1000)
 
-Follows along a Markov chain in time.  
+Follows along a Markov chain in time.
 Initialises a random configuration, sweeps it for `sweep*L^2` timsteps, and records
 magnetetisation every `sample_interval` until `Tmax`.
 """
@@ -200,6 +198,14 @@ end
 ### Wolff algorithm ###
 ### --------------- ###
 
+"""
+    cluster!(cluster_state, state, i,j, p)
+
+Builds a cluster around position `(i,j)` with acceptance rate `p`.
+
+`cluster_state` is a boolean matrix of the same size as the system. It is set to `true` whenever
+a site belongs to the cluster.
+"""
 function cluster!(cluster_state, state, i,j, p)
     @inbounds begin L = size(state, 1)
         s = state[i,j]
@@ -213,6 +219,11 @@ function cluster!(cluster_state, state, i,j, p)
     end
 end
 
+"""
+    wolff_step!(state, cluster_state, beta)
+
+Build a cluster and flip it.
+"""
 function wolff_step!(state, cluster_state, beta)
     @inbounds begin
         L = size(state,1)
@@ -224,6 +235,14 @@ function wolff_step!(state, cluster_state, beta)
     return nothing
 end
 
+"""
+    _run_wolff!(state,cluster,beta,h;Tmax=1,sample_interval=1)
+
+Run the Wolff cluster algorithm on a given state. You need to provide a cluster matrix, e.g
+`similar(state,Bool)`.
+
+See also: [`_run_metropolis`]
+"""
 function _run_wolff!(state::Matrix{Int8},cluster,beta,h;Tmax::Int=1,sample_interval::Int=1)
 
     ## Define a matrix in which to record the observables.
@@ -265,6 +284,11 @@ function _run_wolff!(state::Matrix{Int8},cluster,beta,h;Tmax::Int=1,sample_inter
     return observables/k
 end
 
+"""
+    run_wolff(L, beta,h;Tmax=1,sweep=0,sample_interval=1)
+
+See also: [`run_metropolis`]
+"""
 function run_wolff(L::Int, beta,h;Tmax::Int=1,sweep::Int=0,sample_interval::Int=1)
     ## Initialise a random state
     function init(L,beta)
