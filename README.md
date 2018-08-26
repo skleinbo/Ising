@@ -2,8 +2,8 @@
 
 This package implements Markov-chain-Monte-Carlo methods (MCMC) to study the equilibrium thermodynamic behavior of the Ising model on a square lattice. Currently it implements the classical Metropolis algorithm as well as Wolff's cluster algorithm.
 
-You'll find a source file with all the simulation routines and a notebook that ties them together into parametric studies, produces nice plots and so on.
-The notebook also includes a section called __"Live visualization"__. See below.
+You'll find a source file with all the simulation routines and a notebook that ties them together into parametric studies, produces nice plots and so on.  
+Also included is a notebook for visualizing the dynamics See __"Live visualization"__ below.
 
 It is mainly intended for students of statistical physics learning about phase transitions and critical phenomena.
 
@@ -54,6 +54,7 @@ julia> run_metropolis(L, 1/2.26, 0.; Tmax=25*10^3*L^2,sample_interval=10*L^2,swe
 Admittedly the notebook is not that simple to understand if you hadn't had much exposure to Julia and DataFrames. Write your own routines!
 
 ### Live Visualization
+<center><img src="img/window.png" width=300></img></center>
 
 A few more packages are need to give us interactivity and render a scene. They will be installed automatically once you load `src/visualization.jl`.
 
