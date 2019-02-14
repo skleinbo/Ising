@@ -5,22 +5,38 @@ using Observables: AbstractObservable, on, off, async_latest
 using Reactive
 
 const BASE_FPS = 60
+
+include("src/mcmc.jl");
+include("src/visualization.jl")
+
 ### GUI
 
-s1, g_L = AbstractPlotting.textslider([2^n for n in 2:9], "L")
+s1, g_L = AbstractPlotting.textslider(16:16:512, "L")
 s2, g_mult = AbstractPlotting.textslider(-4.0:0.1:+2.0, "multiplier [log]")
 
 s3, g_h = AbstractPlotting.textslider(-5f0:0.1f0:5f0, start=0f0,"field")
 s4, g_T = AbstractPlotting.textslider(0f0:0.01f0:10f0, "temperature")
 
-b_1 = AbstractPlotting.button(Theme(raw = true, camera = campixel!),"Pause/Play" )
-b1_click = on(b_1[end][:clicks]) do c
+b1 = AbstractPlotting.button(Theme(raw = true, camera = campixel!),"Pause/Play" )
+b2 = AbstractPlotting.button(Theme(raw = true, camera = campixel!),"Metropolis" )
+
+b1_click = on(b1[end][:clicks]) do c
     push!(run_signal, !run_signal.value)
 end
 
+b2_click = on(b2[end][:clicks]) do c
+    if algorithm[] == :metropolis
+        algorithm[] = :wolff
+        b2[end].input_args[end][] = "Wolff"
+    else
+        algorithm[] = :metropolis
+        b2[end].input_args[end][] = "Metropolis"
+    end
+end
+
 ### Logic
-include("src/mcmc.jl");
-include("src/visualization.jl")
+
+algorithm = Node(:metropolis)
 
 # Timey-Wimey
 frame_node = Node(0)
@@ -64,15 +80,19 @@ init_map = lift(L) do L
         end
     end
     global color_signal = on(frame_node) do tic
+        if algorithm[] == :metropolis
             sweep!(config0, round(Int,10^g_mult.val * L^2), 1/g_T.val,g_h.val)
-            color_node[] = reshape(color_gen(config0,0f0),L^2)
-            nothing
+        elseif algorithm[] == :wolff
+            wolff_step!(config0, cluster, 1/g_T[], g_h[])
+        end
+        color_node[] = reshape(color_gen(config0,0f0),L^2)
+        nothing
     end
     global state_plot = Makie.meshscatter(reshape(positions,L^2); color=color_node,
         markersize=1,aspect_ratio=1,marker=GLNormalMesh(square), axis_type=axis3d!, camera=cam3d!,
         size=(800,800), raw=true
         )
-    global scene = vbox(hbox(s1,s2,s3,s4,b_1),state_plot, parent=Scene(resolution=(1024,1024)))
+    global scene = vbox(hbox(s1,s2,s3,s4,b2,b1),state_plot, parent=Scene(resolution=(1024,1024)))
     adjust_cam!(state_plot)
     display(scene);
     # push!(run_signal, true)
