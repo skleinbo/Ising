@@ -224,7 +224,7 @@ end
 
 Build a cluster and flip it.
 """
-function wolff_step!(state, cluster_state, beta)
+function wolff_step!(state, cluster_state, beta, h)
     @inbounds begin
         L = size(state,1)
         i,j = rand(1:L,2)
@@ -264,7 +264,7 @@ function _run_wolff!(state::Matrix{Int8},cluster,beta,h;Tmax::Int=1,sample_inter
             ## Do the defined no. of steps before
             ## taking a measurement
             for _ in 1:sample_interval
-                wolff_step!(state, cluster, beta)
+                wolff_step!(state, cluster, beta, h)
             end
             ## Record observables
             e = H(state,1.,0.)
@@ -296,7 +296,7 @@ function run_wolff(L::Int, beta,h;Tmax::Int=1,sweep::Int=0,sample_interval::Int=
         cluster = zeros(Bool,L,L)
         # Initial sweep to get into the steady state
         for _ in 1:sweep
-            wolff_step!(state, cluster, beta)
+            wolff_step!(state, cluster, beta, h)
         end
         return state,cluster
     end
