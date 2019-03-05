@@ -71,11 +71,11 @@ function metropolis_step!(state::Matrix{Int8},beta,h)
 end
 
 """
-    sweep!(state,n,beta,h)
+    metropolis_sweep!(state,n,beta,h)
 
 Perform n Metropolis steps.
 """
-function sweep!(state,n,beta,h)
+function metropolis_sweep!(state,n,beta,h)
     for _ in 1:n
         metropolis_step!(state,beta,h)
     end
@@ -90,7 +90,7 @@ Setup a configuration with `LxL` spins and perform an intial thermal sweep of
 function init(L,beta,h,sweep)
     state = randomConfiguration(L)
     # Initial sweep to get into the steady state
-    sweep!(state,sweep,beta,h)
+    metropolis_sweep!(state,sweep,beta,h)
     return state
 end
 
@@ -153,7 +153,7 @@ function _run_metropolis!(state::Matrix{Int8},beta,h;Tmax::Int=1,sample_interval
         while(t<Tmax)
             ## Take the defined no. of steps before
             ## recording a measurement
-            sweep!(state,sample_interval,beta,h)
+            metropolis_sweep!(state,sample_interval,beta,h)
 
             ## Record observables
             e = H(state,1.,h)
@@ -182,12 +182,12 @@ magnetetisation every `sample_interval` until `Tmax`.
 """
 function metropolis_timeseries(L::Int, beta, Tmax; sample_interval=L^2, sweep=1000)
     state = init(L,beta,0.,sweep*L^2)
-    ts = Vector{Float64}(div(Tmax,sample_interval))
+    ts = Vector{Float64}(undef, div(Tmax,sample_interval))
     t=0
     k=1
     mag0 = m(state)
     while(t<Tmax)
-        sweep!(state,sample_interval,beta,0.)
+        metropolis_sweep!(state,sample_interval,beta,0.)
         ts[k] = m(state)
         k+=1
         t+=sample_interval
@@ -212,7 +212,7 @@ function cluster!(cluster_state, state, i,j, p)
         cluster_state[i,j] = true
         for neighbor in [(i%L+1,j),(i,j%L+1),(i==1 ? L : i-1,j),(i,j==1 ? L : j-1)]
             if state[neighbor...] == s && !cluster_state[neighbor...] && rand()<p
-                cluster_state[neighbor...]=true
+                cluster_state[neighbor...] = true
                 cluster!(cluster_state, state, neighbor..., p)
             end
         end
@@ -233,6 +233,12 @@ function wolff_step!(state, cluster_state, beta, h)
         state[cluster_state] *= -1
     end
     return nothing
+end
+
+function wolff_sweep!(n, args...)
+    for _ in 1:n
+        wolff_step!(args...)
+    end
 end
 
 """
