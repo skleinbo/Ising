@@ -13,18 +13,23 @@ For now the simulation is restricted to a square lattice with constant couplings
 __If you spot an error or miss a feature, please feel free to open an issue or a pull request!__
 
 ## Compatibility and Installation
+
 Julia >= 1.0 is required.
-
-The simulation routines assembled in `src/mcmc.jl` use base Julia only.
-
-The analysis notebook utilizes various packages. Install them once with
-`]add Plots LaTeXStrings StatsPlots GLM DataFrames DataFramesMeta CSV Distributions`
-
-The visualization uses Makie and requires
-`]add Makie AbstractPlotting Colors Observables`
 
 Clone the repository to your computer
 `git clone https://github.com/skleinbo/Ising.git`
+
+The simulation routines assembled in `src/mcmc.jl` use base Julia only.
+
+The visualization uses [Makie](https://github.com/JuliaPlots/Makie.jl) and a few other packages (see `Project.toml`). Loading `Visual_Ising.jl`, e.g. running
+```bash
+julia -i Visual_Ising.jl
+```
+will automatically install dependencies into the project's own environment. Your standard package environment will not be affected.
+
+The analysis notebook utilizes various additional packages which are not installed by default. Install them once with
+`]add Plots LaTeXStrings StatsPlots GLM DataFrames DataFramesMeta CSV Distributions`
+
 
 ## Usage
 Load the MCMC methods with `include(src/mcmc.jl)`.

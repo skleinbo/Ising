@@ -1,7 +1,11 @@
+import Pkg
+Pkg.activate(@__DIR__)
+Pkg.resolve()
+
 using Makie
 using GeometryTypes, AbstractPlotting, Colors
 import Observables
-using Observables: AbstractObservable, on, off, async_latest
+import Observables: AbstractObservable, on, off, async_latest
 
 include("src/mcmc.jl");
 include("src/visualization.jl")
@@ -10,7 +14,7 @@ include("src/visualization.jl")
 color1 = colorant"black"
 color2 = colorant"cornflowerblue"
 # s1, g_L = AbstractPlotting.textslider(16:16:512, "L")
-s2, g_mult = AbstractPlotting.textslider(-3.0:0.1:+2.0, start=-2.0, "speed [log]")
+s2, g_mult = AbstractPlotting.textslider(-3.0:0.1:+2.0, start=-2.0, "speed [log10]")
 
 s3, g_h = AbstractPlotting.textslider(-5f0:0.1f0:5f0, start=0f0,"field")
 s4, g_T = AbstractPlotting.textslider(0f0:0.005f0:5f0, "temperature")
@@ -86,7 +90,7 @@ init_map = lift(g_L) do L
     color_node[] = reshape(color_gen(config0,color1, color2),L^2)
 
     global state_plot = Makie.meshscatter(reshape(positions,L^2); color=color_node,
-        markersize=1,marker=GLNormalMesh(square), axis_type=axis2d!, camera=cam2d!,
+        markersize=1,marker=GLNormalMesh(square), camera=cam2d!,
         raw=true, shading=false
         )
     # state_plot.attributes[:padding][] = [0f0, 0f0, 0f0]
