@@ -26,7 +26,6 @@ Energy of Ising configuration for a given coupling `J` and external field `h`.
 """
 function H(state::Matrix{Int8},J=1.,h=0.)
     L = size(state,1)
-    s = 0.
     s = h*(sum(state))
 
     @inbounds for i in 1:L, j in 1:L
