@@ -2,30 +2,25 @@
 
 This package implements Markov-chain-Monte-Carlo methods (MCMC) to study the equilibrium thermodynamic behavior of the Ising model on a square lattice. Currently it implements the classical Metropolis algorithm as well as Wolff's cluster algorithm.
 
-You'll find a source file with all the simulation routines and a notebook that ties them together into parametric studies, produces nice plots and so on.
-To watch the algorithms in action, a visualization app based on [Makie](http://makie.juliaplots.org/stable/index.html) is included. ![visualization](img/window.png)
+You will find a source file with all the simulation routines and a notebook (`extras/MCMC_Ising.ipynb`) that ties them together into parametric studies, produces nice plots and so on.
 
+To watch the algorithms in action, a visualization app based on [Makie](http://makie.juliaplots.org/stable/index.html) is provided. ![visualization](img/window.png)
 
-It is mainly intended for students of statistical physics learning about phase transitions and critical phenomena.
-
-For now the simulation is restricted to a square lattice with constant couplings and external fields. It should however be easy to extend the code to cover more general systems.
+For now the simulation is restricted to a square lattice with constant couplings and external fields. It should however be fairly straightforward to extend the code to cover more general systems.
 
 __If you spot an error or miss a feature, please feel free to open an issue or a pull request!__
 
 ## Compatibility and Installation
 
-Julia >= 1.0 is required.
+Julia >= 1.3 is required.
 
 Clone the repository to your computer
 `git clone https://github.com/skleinbo/Ising.git`
+or download the latest release.
 
-The simulation routines assembled in `src/mcmc.jl` use base Julia only.
+The simulation routines assembled in `src/mcmc.jl` use base Julia only. [TODO: Wrap them in a module]
 
-The visualization uses [Makie](https://github.com/JuliaPlots/Makie.jl) and a few other packages (see `Project.toml`). Loading `Visual_Ising.jl`, e.g. running
-```bash
-julia -i Visual_Ising.jl
-```
-will automatically install dependencies into the project's own environment. Your standard package environment will not be affected.
+The interactive application requires [Makie](https://github.com/JuliaPlots/Makie.jl) and a few other packages (see `Project.toml`). Start Julia from the root of the cloned directory with `julia --project`. The first time you use the app, install the dependencies from the REPL with `] instantiate`. Then start the app via `include("bin/main.jl")`.
 
 The analysis notebook utilizes various additional packages which are not installed by default. Install them once with
 `]add Plots LaTeXStrings StatsPlots GLM DataFrames DataFramesMeta CSV Distributions`
@@ -97,13 +92,18 @@ Admittedly the notebook may not be simple to understand if you hadn't had much e
 
 ### Live Visualization
 `include("Visual_Ising.jl")` opens a window with sliders and buttons to adjust
-parameters on the left, and a depiction of the current state on the right. Zoom in
-and out with the mouse wheel. "Speed"
-determines how many steps the algorithm takes per frame, i.e a value of `-2.0` means
-`1/100*L^2` updates per frame (default: 60fps; change with `BASE_FPS[]=$fps`).
+parameters, a depiction of the current state, as well as energy and magnetization over time. Zoom in
+and out with the mouse wheel.
+"Speed" determines how many sweeps the program does per frame, i.e a value of `1/2` means
+`1/2*L^2` attempts to flip a spin/cluster (Metropolis/Wolff) each frame (default: 60fps; change with `BASE_FPS[]=$fps`).
 
-* _To change the system size (default 128x128):_ `g_L[]=_linear system size_`
-* Press <kbd>p</kbd> to run/pause the simulation
-* Reset the state by pressing <kbd>r</kbd>
-* Speed up/slow down with <kbd>=</kbd> / <kbd>-</kbd> (QWERTY layout)
-* Reset the view with <kbd>c</kbd>
+__Warning:__ Choosing this value to high will freeze the application, in particular when the system size is large too.
+
+__Controls:__
+  * To change the system size (default 128x128): `L[]=_linear system size_`
+  * Adjust frame rate: `BASE_FPS[] = _fps_`
+  * To change colors of the two states, set `color1` and `color2`
+  * Press <kbd>p</kbd> to run/pause the simulation
+  * Reset the state by pressing <kbd>r</kbd>
+  * Speed up/slow down with <kbd>=</kbd> / <kbd>-</kbd> (QWERTY layout)
+  * Reset the view with <kbd>c</kbd>
