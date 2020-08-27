@@ -26,7 +26,6 @@ Energy of Ising configuration for a given coupling `J` and external field `h`.
 """
 function H(state::Matrix{Int8},J=1.,h=0.)
     L = size(state,1)
-    s = 0.
     s = h*(sum(state))
 
     @inbounds for i in 1:L, j in 1:L
@@ -235,9 +234,9 @@ function wolff_step!(state, cluster_state, beta, h)
     return nothing
 end
 
-function wolff_sweep!(n, args...)
+function wolff_sweep!(state, cluster, n, args...)
     for _ in 1:n
-        wolff_step!(args...)
+        wolff_step!(state, cluster, args...)
     end
 end
 

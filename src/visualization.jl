@@ -28,6 +28,6 @@ end
 # appropriate size
 function get_primitives(L::Integer)
     return (Point2f0[Point2f0(2*xi/L-1.,2*yi/L-1.) for (xi,yi) in product(0:L-1,0:L-1)],
-     HyperRectangle(0,0,0,2/L,2/L,0)
+     GeometryBasics.HyperRectangle(0,0,0,2/L,2/L,0)
      )
  end
