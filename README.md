@@ -8,7 +8,9 @@ To watch the algorithms in action, a visualization app based on [Makie](http://m
 
 For now the simulation is restricted to a square lattice with constant couplings and external fields. It should however be fairly straightforward to extend the code to cover more general systems.
 
-__If you spot an error or miss a feature, please feel free to open an issue or a pull request!__
+_Please dig around the source, alter the UI to your liking, introduce new observables, etc!_
+
+_If you spot an error or miss a feature, please feel free to open an issue or a pull request!_
 
 ## Compatibility and Installation
 
@@ -88,16 +90,15 @@ julia> run_metropolis(L, 1/2.26, 0.; Tmax=25*10^3*L^2,sample_interval=10*L^2,swe
      1.0010325963705214e-10
 ```
 
-Admittedly the notebook may not be simple to understand if you hadn't had much exposure to Julia and DataFrames. And even if, it's not well documentes. __Write your own routines!__
+Admittedly the notebook may not be simple to understand if you hadn't had much exposure to Julia and DataFrames. And even if, it is not well documented. __Write your own routines!__
 
 ### Live Visualization
 `include("Visual_Ising.jl")` opens a window with sliders and buttons to adjust
 parameters, a depiction of the current state, as well as energy and magnetization over time. Zoom in
 and out with the mouse wheel.
 "Speed" determines how many sweeps the program does per frame, i.e a value of `1/2` means
-`1/2*L^2` attempts to flip a spin/cluster (Metropolis/Wolff) each frame (default: 60fps; change with `BASE_FPS[]=$fps`).
-
-__Warning:__ Choosing this value to high will freeze the application, in particular when the system size is large too.
+`1/2*L^2` attempts to flip a spin each frame (default: 60fps; change with `BASE_FPS[]=$fps`).
+The cluster update algorithm will always perform _one_ update per frame. Larger values typically exceed the desired frame time easily.
 
 __Controls:__
   * To change the system size (default 128x128): `L[]=_linear system size_`
@@ -107,3 +108,9 @@ __Controls:__
   * Reset the state by pressing <kbd>r</kbd>
   * Speed up/slow down with <kbd>=</kbd> / <kbd>-</kbd> (QWERTY layout)
   * Reset the view with <kbd>c</kbd>
+  * <kbd>l</kbd> performs a sweep of `1.000*N` spin flips or `1.000` cluster updates respectively.
+  * <kbd>a</kbd> toggles between spin-flip and cluster updates.
+
+  __Warning:__ Choosing `BASE_FPS` or speed to large will freeze the application, in particular when the system size is large too. You will notice the UI becoming unresponsive, because both the UI and the simulation run on the same thread (TODO: make this multi-threaded).
+
+  A Core i5 (2016) @ 3.2GHz caps out above L=512.
