@@ -234,9 +234,9 @@ function wolff_step!(state, cluster_state, beta, h)
     return nothing
 end
 
-function wolff_sweep!(n, args...)
+function wolff_sweep!(state, cluster, n, args...)
     for _ in 1:n
-        wolff_step!(args...)
+        wolff_step!(state, cluster, args...)
     end
 end
 
