@@ -1,8 +1,11 @@
+import Pkg; Pkg.instantiate();
+
 using GeometryBasics, Colors
 import Observables
-import Observables: AbstractObservable, on, off, async_latest
+import Observables: on, off, notify!
 
 import GLMakie
+import GLFW: SetWindowTitle
 using AbstractPlotting
 using AbstractPlotting.MakieLayout
 
@@ -64,6 +67,14 @@ size_change = lift(L) do L
     nothing
 end
 
+color_update = lift(config0) do config0
+    # TODO: recalculating all colors is wasteful
+    # -> return flipped spins -> adjust color
+    color_node[] = reshape(color_gen(config0, color1, color2),L[]^2)
+end
+
+
+# Plot of the lattice
 meshscatter!(state_plot, positions; color=color_node,
     markersize=1, camera=cam2d!, marker=square,
     raw=true, shading=false
@@ -74,10 +85,20 @@ state_plot.scene[end][:light] = Vec{3,Float32}[[1.0, 1.0, 1.0], [0.1, 0.1, 0.1],
 
 toggle_run!() = run_signal[] = !run_signal[]
 toggle_algo!() = algorithm[] = algorithm[] == :metropolis ? :wolff : :metropolis
+
+function set_title!()
+    title_string = "Ising - $(titlecase(string(algorithm[])))"
+    if mult[] == 0.0 || !run_signal[]
+        title_string *= " - PAUSED"
+    end
+    SetWindowTitle(GLMakie.gl_screens[1], title_string)
+end
+
 # Keys:
 #   - r: reset state and plots
 #   - c: reset camera
 #   - +/- (QWERTY): adjust simulation speed
+#   - s: short sweep: 1 time
 #   - l: long sweep 1_000 times
 #   - a: switch algorithm Metropolis/Wolff
 on(scene.events.keyboardbuttons) do buttons
@@ -96,10 +117,14 @@ on(scene.events.keyboardbuttons) do buttons
         empty!(time_buffer[])
         empty!(E_buffer[])
         empty!(M_buffer[])
+        notify!(config0)
+    elseif ispressed(scene, Keyboard.s)
+        run_signal[] = false
+        _sweep!(config0, L[]^2)
+        _measure!()
     elseif ispressed(scene, Keyboard.l)
         run_signal[] = false
-        _sweep!(config0[], 1_000*L[]^2)
-        run_signal[] = true
+        _sweep!(config0, 1_000*L[]^2)
     elseif ispressed(scene, Keyboard.equal)
         mult[] = min(mult[]+0.05, 1.0)
     elseif ispressed(scene, Keyboard.minus)
@@ -107,6 +132,7 @@ on(scene.events.keyboardbuttons) do buttons
     elseif ispressed(scene, Keyboard.a)
         toggle_algo!()
     end
+    set_title!()
 end
 on(scene.events.window_area) do wa
     update_cam!(state_plot.scene, FRect(-1,-1,2,2))
@@ -137,10 +163,30 @@ end
 
 function _sweep!(config0, n)
     if algorithm[] == :metropolis
-        metropolis_sweep!(config0, n, 1/T[], h[])
+        metropolis_sweep!(config0[], n, 1/T[], h[])
     elseif algorithm[] == :wolff
-        wolff_sweep!(config0, cluster[], ceil(Int, n/L[]^2), 1/T[], h[])
+        wolff_sweep!(config0[], cluster[], ceil(Int, n/L[]^2), 1/T[], h[])
     end
+    notify!(config0)
+    nothing
+end
+
+function _measure!()
+    t = if length(time_buffer[])>0
+            time_buffer[][end]
+        else
+             0.0
+        end + mult[]
+    push!(time_buffer[], t)
+    push!(E_buffer[], Point2(t, H(config0[], 1.0, h[])/L[]^2))
+    push!(M_buffer[], Point2(t, m(config0[])))
+    if length(E_buffer[]) > BUFFER_LENGTH
+        deleteat!(E_buffer[], 1)
+        deleteat!(M_buffer[], 1)
+        deleteat!(time_buffer[], 1)
+    end
+    Observables.notify!(E_buffer)
+    Observables.notify!(M_buffer)
     nothing
 end
 
@@ -149,26 +195,11 @@ function renderloop()
         while scene.events.window_open[]
             t1 = time()
             if run_signal[] && mult[] > 0.0
-                _sweep!(config0[], round(Int, mult[] * L[]^2))
-                color_node[] = reshape(color_gen(config0[], color1, color2),L[]^2)
+                _sweep!(config0, round(Int, mult[] * L[]^2))
                 # Measure observables
                 # and push them to the relevant buffers.
                 # Prune buffers if necessary.
-                t = if length(time_buffer[])>0
-                        time_buffer[][end]
-                    else
-                         0.0
-                    end + mult[]
-                push!(time_buffer[], t)
-                push!(E_buffer[], Point2(t, H(config0[], 1.0, h[])/L[]^2))
-                push!(M_buffer[], Point2(t, m(config0[])))
-                if length(E_buffer[]) > BUFFER_LENGTH
-                    deleteat!(E_buffer[], 1)
-                    deleteat!(M_buffer[], 1)
-                    deleteat!(time_buffer[], 1)
-                end
-                Observables.notify!(E_buffer)
-                Observables.notify!(M_buffer)
+                _measure!()
             end
             t2 = time()
             if (t2-t1) < 1/BASE_FPS[]
