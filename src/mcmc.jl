@@ -1,6 +1,9 @@
 ### Monte Carlo routines for
 ### the 2D Ising model
 
+import StatsBase: countmap
+import StaticArrays: SVector
+
 """
     randomConfiguration(L)
 
@@ -53,6 +56,51 @@ Magnetization per spin
 """
 m(state) = Float64(sum(state)/length(state))
 
+@inline neighbors(i,j,L) = CartesianIndex.([(i%L+1,j),(i,j%L+1),(i==1 ? L : i-1,j),(i,j==1 ? L : j-1)])
+@inline function neighbors(i,L)
+    r = (i-1)%L
+    c = div(i-1, L)
+    # @info r,c
+    SVector{4, Int32}(1 + (r+1)%L + c*L, 1 + ((r-1)>=0 ? r-1 : L-1) + c*L, 1 + r + L*((c+1)%L), 1 + r + L*((c-1)>=0 ? c-1 : L-1))
+end
+@inline function neighbors_leftup(i,L)
+    r = (i-1)%L
+    c = div(i-1, L)
+    # @info r,c
+    SVector{2, Int32}(1 + ((r-1)>=0 ? r-1 : L-1) + c*L, 1 + r + L*((c-1)>=0 ? c-1 : L-1))
+end
+
+
+"""
+    cluster_sizes(state)
+
+A cluster is a connected region of aligned spins. Retrieve the sizes of all of them.
+"""
+function cluster_sizes(state)
+    # Check for each element if they belong to the same cluster
+    # as their left or upper neighbor. 
+    cluster = zeros(Int32, size(state))
+    max_cluster = 0
+    pointer = 1
+    new_cluster = true
+    while pointer <= length(state)
+        nn = neighbors_leftup(pointer, size(state, 1))
+        new_cluster = true
+        for n in nn
+            if cluster[n]!=0 && state[pointer]==state[n]
+                cluster[pointer] = cluster[n]
+                new_cluster = false
+            end
+        end
+        if new_cluster
+            cluster[pointer] = max_cluster += 1
+        end
+        pointer += 1
+    end
+
+    return countmap(reshape(cluster, length(cluster))) |> values |> collect
+end
+
 """
     metropolis_step!(state,beta,h)
 
@@ -87,7 +135,7 @@ Setup a configuration with `LxL` spins and perform an intial thermal sweep of
 `sweep` timesteps.
 """
 function init(L,beta,h,sweep)
-    state = randomConfiguration(L)
+    state = fill(Int8(-1), L, L)
     # Initial sweep to get into the steady state
     metropolis_sweep!(state,sweep,beta,h)
     return state
@@ -140,7 +188,7 @@ function _run_metropolis!(state::Matrix{Int8},beta,h;Tmax::Int=1,sample_interval
     ## One entry for each observable, e.g E and m.
     ## Preallocating the matrix gives much better performance than
     ## constructing it on the fly.
-    observables = zeros(Float64,5)
+    observables = zeros(Float64, 5)
 
     k = 0 #counts the number of samples
 
@@ -177,21 +225,28 @@ end
 
 Follows along a Markov chain in time.
 Initialises a random configuration, sweeps it for `sweep*L^2` timsteps, and records
-magnetetisation every `sample_interval` until `Tmax`.
+magnetetisation and energy every `sample_interval` until `Tmax`.
+
+Returns a tuple of these time series.
 """
 function metropolis_timeseries(L::Int, beta, Tmax; sample_interval=L^2, sweep=1000)
     state = init(L,beta,0.,sweep*L^2)
-    ts = Vector{Float64}(undef, div(Tmax,sample_interval))
+    #time series magnetization
+    tsm = Vector{Float64}(undef, div(Tmax,sample_interval))
+    #time series energy
+    tse = Vector{Float64}(undef, div(Tmax,sample_interval))
+
     t=0
     k=1
     mag0 = m(state)
     while(t<Tmax)
         metropolis_sweep!(state,sample_interval,beta,0.)
-        ts[k] = m(state)
-        k+=1
+        tsm[k] = m(state)
+        tse[k] = H(state)
         t+=sample_interval
+        k+=1
     end
-    return ts
+    return tsm, tse
 end
 
 ### Wolff algorithm ###
@@ -209,10 +264,10 @@ function cluster!(cluster_state, state, i,j, p)
     @inbounds begin L = size(state, 1)
         s = state[i,j]
         cluster_state[i,j] = true
-        for neighbor in [(i%L+1,j),(i,j%L+1),(i==1 ? L : i-1,j),(i,j==1 ? L : j-1)]
-            if state[neighbor...] == s && !cluster_state[neighbor...] && rand()<p
-                cluster_state[neighbor...] = true
-                cluster!(cluster_state, state, neighbor..., p)
+        for neighbor in neighbors(i,j,L)
+            if state[neighbor] == s && !cluster_state[neighbor] && rand()<p
+                cluster_state[neighbor] = true
+                cluster!(cluster_state, state, Tuple(neighbor)..., p)
             end
         end
     end
