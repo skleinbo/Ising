@@ -1,38 +1,35 @@
-import Pkg; Pkg.instantiate();
+# import Pkg; Pkg.instantiate();
 
 using GeometryBasics, Colors
 import Observables
-import Observables: on, off, notify!
+import Observables: on, off, notify
 
 import GLMakie
-import GLFW: SetWindowTitle
-using AbstractPlotting
-using AbstractPlotting.MakieLayout
-
+import GLMakie: GLFW
 
 include("../src/mcmc.jl");
 include("../src/visualization.jl")
 
 ### GUI
 
-scene, layout = layoutscene(resolution=(768,1024))
+fig = Figure(resolution=(768,1024))
 
-state_plot = layout[1,1:2] = LScene(scene, raw=true, camera = cam2d!, autolimitaspect=1.0)
-sub_plot_energy = layout[3,1] = LAxis(scene, title="Energy")
-sub_plot_mag = layout[3,2] = LAxis(scene, title="Magnetization")
+light = AmbientLight(colorant"white")
 
-g_T = labelslider!(scene, "temp", 0f0:0.005f0:5f0)
-T = g_T.slider.value
-g_h = labelslider!(scene, "field", -5f0:0.1f0:5f0)
-h = g_h.slider.value
-g_mult = labelslider!(scene, "speed", 0.0:0.05:1.0, sliderkw=Dict(:startvalue=>0.5))
-mult = g_mult.slider.value
-sub_controls = layout[2,:] = GridLayout()
-sub_controls[1,1] = g_T.layout
-sub_controls[1,2] = g_h.layout
-sub_controls[2,1:2] = g_mult.layout
+state_plot = LScene(fig[1,1:2], show_axis=false, scenekw=(raw=true, light=[light], camera = cam2d!, autolimitaspect=1.0))
+sub_plot_energy = Axis(fig[3,1], title="Energy")
+sub_plot_mag = Axis(fig[3,2], title="Magnetization")
 
-rowsize!(layout, 3, Relative(1/6))
+sub_controls = SliderGrid(fig[2,1], 
+    (label="temp",  range=0f0:0.005f0:5f0),
+    (label="field", range=-5f0:0.1f0:5f0),
+    (label="speed", range=0.0:0.05:1.0, :startvalue=>0.5)
+)
+T = sub_controls.sliders[1].value
+h = sub_controls.sliders[2].value
+mult = sub_controls.sliders[3].value
+
+rowsize!(fig.layout, 3, Relative(1/6))
 
 color1 = colorant"black"
 color2 = colorant"cornflowerblue"
@@ -40,15 +37,15 @@ color2 = colorant"cornflowerblue"
 
 ### Logic
 
-algorithm = Node(:metropolis) # either :metropolis or :wolff
+algorithm = Observable(:metropolis) # either :metropolis or :wolff
 
 # Timey-Wimey
-frame_node = Node(0)
-run_signal = Node(false)
-BASE_FPS = Node(60)
+frame_node = Observable(0)
+run_signal = Observable(false)
+BASE_FPS = Observable(60)
 BUFFER_LENGTH = 1024 # no. of stored observations
 
-L = Node(128) # linear system size
+L = Observable(128) # linear system size
 
 pos_and_marker = lift(get_primitives, L)
 positions = lift(x->reshape(x[1], length(x[1])), pos_and_marker)
@@ -62,7 +59,7 @@ size_change = lift(L) do L
     run_signal[] = false
 
     update_cam!(state_plot.scene, FRect(-1,-1,2,2))
-    display(scene);
+    display(fig);
 
     nothing
 end
@@ -76,10 +73,9 @@ end
 
 # Plot of the lattice
 meshscatter!(state_plot, positions; color=color_node,
-    markersize=1, camera=cam2d!, marker=square,
-    raw=true, shading=false
+    markersize=1, marker=square,
+    # scene=(camera=cam2d!, raw=true, shading=false),
     )
-state_plot.scene[end][:light] = Vec{3,Float32}[[1.0, 1.0, 1.0], [0.1, 0.1, 0.1], [0.9, 0.9, 0.9], [0.0, 0.0, -20.0]]
 
 ## Events
 
@@ -91,7 +87,7 @@ function set_title!()
     if mult[] == 0.0 || !run_signal[]
         title_string *= " - PAUSED"
     end
-    SetWindowTitle(GLMakie.gl_screens[1], title_string)
+    GLFW.SetWindowTitle(fig.scene.current_screens[1].glscreen, title_string)
 end
 
 # Keys:
@@ -101,47 +97,47 @@ end
 #   - s: short sweep: 1 time
 #   - l: long sweep 1_000 times
 #   - a: switch algorithm Metropolis/Wolff
-on(scene.events.keyboardbuttons) do buttons
-    if ispressed(scene, Keyboard.p)
+on(fig.scene.events.keyboardbutton) do buttons
+    if ispressed(fig.scene, Keyboard.p)
         # if the renderloop ended for some reason
         # it is restarted here
         if istaskdone(render_task)
             global render_task = renderloop()
         end
         toggle_run!()
-    elseif ispressed(scene, Keyboard.c)
+    elseif ispressed(fig.scene, Keyboard.c)
         update_cam!(state_plot.scene, FRect(-1,-1,2,2))
-    elseif ispressed(scene, Keyboard.r)
+    elseif ispressed(fig.scene, Keyboard.r)
         config0[] = frustratedConfiguration(L[]);
         cluster[] = zeros(Bool, L[],L[]);
         empty!(time_buffer[])
         empty!(E_buffer[])
         empty!(M_buffer[])
-        notify!(config0)
-    elseif ispressed(scene, Keyboard.s)
+        notify(config0)
+    elseif ispressed(fig.scene, Keyboard.s)
         run_signal[] = false
         _sweep!(config0, L[]^2)
         _measure!()
-    elseif ispressed(scene, Keyboard.l)
+    elseif ispressed(fig.scene, Keyboard.l)
         run_signal[] = false
         _sweep!(config0, 1_000*L[]^2)
-    elseif ispressed(scene, Keyboard.equal)
+    elseif ispressed(fig.scene, Keyboard.equal)
         mult[] = min(mult[]+0.05, 1.0)
-    elseif ispressed(scene, Keyboard.minus)
+    elseif ispressed(fig.scene, Keyboard.minus)
         mult[] = max(mult[]-0.05, 0.0)
-    elseif ispressed(scene, Keyboard.a)
+    elseif ispressed(fig.scene, Keyboard.a)
         toggle_algo!()
     end
     set_title!()
 end
-on(scene.events.window_area) do wa
+on(fig.scene.events.window_area) do wa
     update_cam!(state_plot.scene, FRect(-1,-1,2,2))
 end
 
 ## Physical observables
-time_buffer = Node([0.0])
-E_buffer = Node([Point2(0.0,0.0)]) # pairs of (time, value)
-M_buffer = Node([Point2(0.0,0.0)])
+time_buffer = Observable([0.0])
+E_buffer = Observable([Point2(0.0,0.0)]) # pairs of (time, value)
+M_buffer = Observable([Point2(0.0,0.0)])
 
 
 E_plot = lines!(sub_plot_energy, E_buffer)
@@ -167,7 +163,7 @@ function _sweep!(config0, n)
     elseif algorithm[] == :wolff
         wolff_sweep!(config0[], cluster[], ceil(Int, n/L[]^2), 1/T[], h[])
     end
-    notify!(config0)
+    notify(config0)
     nothing
 end
 
@@ -185,14 +181,14 @@ function _measure!()
         deleteat!(M_buffer[], 1)
         deleteat!(time_buffer[], 1)
     end
-    Observables.notify!(E_buffer)
-    Observables.notify!(M_buffer)
+    Observables.notify(E_buffer)
+    Observables.notify(M_buffer)
     nothing
 end
 
 function renderloop()
     @async begin
-        while scene.events.window_open[]
+        while fig.scene.events.window_open[]
             t1 = time()
             if run_signal[] && mult[] > 0.0
                 _sweep!(config0, round(Int, mult[] * L[]^2))
@@ -212,4 +208,4 @@ end
 
 render_task = renderloop()
 
-display(scene)
+display(fig)
