@@ -190,7 +190,7 @@ function _measure!()
 end
 
 function renderloop()
-    Threads.@spawn begin
+    @async begin
         while fig.scene.events.window_open[]
             t1 = time()
             if run_signal[] && mult[] > 0.0
