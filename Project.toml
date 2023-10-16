@@ -15,6 +15,7 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 [compat]
 DataFrames = "1.4"
 DataFramesMeta = "0.14"
+DataStructures = "0.18"
 GLMakie = "0.8"
 GeometryBasics = "0.4"
 Observables = "0.5"

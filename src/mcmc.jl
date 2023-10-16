@@ -1,8 +1,9 @@
 ### Monte Carlo routines for
 ### the 2D Ising model
 
+import DataStructures: Stack
 import StatsBase: countmap
-import StaticArrays: SVector
+import StaticArrays: SVector, @SVector
 
 """
     randomConfiguration(L)
@@ -56,18 +57,26 @@ Magnetization per spin
 """
 m(state) = Float64(sum(state)/length(state))
 
-@inline neighbors(i,j,L) = CartesianIndex.([(i%L+1,j),(i,j%L+1),(i==1 ? L : i-1,j),(i,j==1 ? L : j-1)])
+@inline neighbors(i,j,L) = [(i%L+1,j),(i,j%L+1),(i==1 ? L : i-1,j),(i,j==1 ? L : j-1)]
 @inline function neighbors(i,L)
     r = (i-1)%L
     c = div(i-1, L)
     # @info r,c
-    SVector{4, Int32}(1 + (r+1)%L + c*L, 1 + ((r-1)>=0 ? r-1 : L-1) + c*L, 1 + r + L*((c+1)%L), 1 + r + L*((c-1)>=0 ? c-1 : L-1))
+    SVector{4, Int32}(
+        1 + (r+1)%L + c*L,                  # up
+        1 + ((r-1)>=0 ? r-1 : L-1) + c*L,   # down
+        1 + r + L*((c+1)%L),                # right
+        1 + r + L*((c-1)>=0 ? c-1 : L-1)    # left
+    )
 end
 @inline function neighbors_leftup(i,L)
     r = (i-1)%L
     c = div(i-1, L)
     # @info r,c
-    SVector{2, Int32}(1 + ((r-1)>=0 ? r-1 : L-1) + c*L, 1 + r + L*((c-1)>=0 ? c-1 : L-1))
+    SVector{2, Int32}(
+        1 + ((r-1)>=0 ? r-1 : L-1) + c*L,
+        1 + r + L*((c-1)>=0 ? c-1 : L-1)
+    )
 end
 
 
@@ -252,25 +261,46 @@ end
 ### Wolff algorithm ###
 ### --------------- ###
 
+function bonds(i, L)
+    nbs = neighbors(i, L)
+    l_nb, d_nb = nbs[4], nbs[2]
+    ((i,1), (d_nb, 1), (i,2), (l_nb, 2)), nbs
+end
+
 """
     cluster!(cluster_state, state, i,j, p)
 
-Builds a cluster around position `(i,j)` with acceptance rate `p`.
+Builds a cluster around position `(i,j)` with acceptance probability `p`.
 
-`cluster_state` is a boolean matrix of the same size as the system. It is set to `true` whenever
+`cluster_state` is a boolean matrix of `size(state)×2`. It is set to `true` whenever
 a site belongs to the cluster.
 """
-function cluster!(cluster_state, state, i,j, p)
-    @inbounds begin L = size(state, 1)
-        s = state[i,j]
-        cluster_state[i,j] = true
-        for neighbor in neighbors(i,j,L)
-            if state[neighbor] == s && !cluster_state[neighbor] && rand()<p
-                cluster_state[neighbor] = true
-                cluster!(cluster_state, state, Tuple(neighbor)..., p)
+function cluster!(cluster_state, state, i, p)
+    nflipped = 0
+    @inbounds begin
+        L = size(state, 1)
+        to_visit = Stack{Int}(L^2)
+        cur = i
+        s = state[cur]
+        push!(to_visit, cur)
+        while !isempty(to_visit)
+            cur = pop!(to_visit)
+            if state[cur] == s
+                state[cur] = -s
+                nflipped += 1
+            end
+            bnds, nbs = bonds(cur, L)
+            for (b,n) in zip(bnds, nbs)
+                if !cluster_state[b...]
+                    cluster_state[b...] = true
+                    if state[n]==s && rand()<p
+                        push!(to_visit, n)
+                    end
+                end
             end
         end
     end
+    return nflipped
 end
 
 """
@@ -278,21 +308,23 @@ end
 
 Build a cluster and flip it.
 """
-function wolff_step!(state, cluster_state, beta, h)
+function wolff_step!(state, cluster_state, beta, h=0.0)
     @inbounds begin
         L = size(state,1)
-        i,j = rand(1:L,2)
+        i = rand(1:L^2)
         fill!(cluster_state, false)
-        cluster!(cluster_state, state, i,j, 1.0-exp(-2.0*beta))
-        state[cluster_state] *= -1
+        nflipped = cluster!(cluster_state, state, i, 1.0-exp(-2.0*beta))
+        # state[view(cluster_state, :,:,1)] *= -1
     end
-    return nothing
+    return nflipped
 end
 
 function wolff_sweep!(state, cluster, n, args...)
+    nflipped = 0
     for _ in 1:n
-        wolff_step!(state, cluster, args...)
+        nflipped += wolff_step!(state, cluster, args...)
     end
+    return nflipped
 end
 
 """
@@ -353,7 +385,7 @@ function run_wolff(L::Int, beta,h;Tmax::Int=1,sweep::Int=0,sample_interval::Int=
     ## Initialise a random state
     function init(L,beta)
         state = randomConfiguration(L)
-        cluster = zeros(Bool,L,L)
+        cluster = fill(false, L^2, 2) # (up, right) neighbor bonds for each site
         # Initial sweep to get into the steady state
         for _ in 1:sweep
             wolff_step!(state, cluster, beta, h)
@@ -361,6 +393,6 @@ function run_wolff(L::Int, beta,h;Tmax::Int=1,sweep::Int=0,sample_interval::Int=
         return state,cluster
     end
 
-    state,cluster = init(L,beta)
+    state, cluster = init(L,beta)
     return _run_wolff!(state,cluster,beta,0.,Tmax=Tmax,sample_interval=sample_interval)
 end

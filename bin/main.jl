@@ -51,7 +51,7 @@ pos_and_marker = lift(get_primitives, L)
 positions = lift(x->reshape(x[1], length(x[1])), pos_and_marker)
 square = lift(x->x[2], pos_and_marker)
 config0 = lift(frustratedConfiguration, L)
-cluster = lift(L->zeros(Bool, L,L), L)
+cluster = lift(L->fill(false, L^2, 2), L)
 
 color_node = lift(L->[color1 for j in 1:L^2], L)
 
@@ -109,7 +109,7 @@ on(fig.scene.events.keyboardbutton) do buttons
         update_cam!(state_plot.scene, FRect(-1,-1,2,2))
     elseif ispressed(fig.scene, Keyboard.r)
         config0[] = frustratedConfiguration(L[]);
-        cluster[] = zeros(Bool, L[],L[]);
+        cluster[] = fill(false, L[]^2, 2);
         empty!(time_buffer[])
         empty!(E_buffer[])
         empty!(M_buffer[])
@@ -161,7 +161,10 @@ function _sweep!(config0, n)
     if algorithm[] == :metropolis
         metropolis_sweep!(config0[], n, 1/T[], h[])
     elseif algorithm[] == :wolff
-        wolff_sweep!(config0[], cluster[], ceil(Int, n/L[]^2), 1/T[], h[])
+        nflipped = 0
+        while nflipped < ceil(L[]^2 * 0.8) # safety factor
+            nflipped += wolff_sweep!(config0[], cluster[], 1, 1/T[], h[])
+        end
     end
     notify(config0)
     nothing
