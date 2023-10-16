@@ -4,7 +4,7 @@ using GeometryBasics, Colors
 import Observables
 import Observables: on, off, notify
 
-import GLMakie
+using GLMakie
 import GLMakie: GLFW
 
 include("../src/mcmc.jl");
